@@ -1,5 +1,5 @@
 {
-  "name": "navigate-web",
+  "name": "ocr-image",
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
@@ -9,9 +9,7 @@
     "build": "tsc"
   },
   "devDependencies": {
-    "nodemon": "^2.0.15"
+    "typescript": "^4.6.2"
   },
-  "dependencies": {
-    "puppeteer": "^13.4.1"
-  }
+  "dependencies": {}
 }

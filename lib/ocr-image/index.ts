@@ -2,8 +2,8 @@ import { recognize } from 'node-tesseract-ocr'
 
 const ocrConfig = {
   lang: 'eng',
-  psm: '3',
-  debug: true,
+  psm: 3,
+  debug: false,
   tsv: true,
 }
 
@@ -45,3 +45,7 @@ function filter(txt) {
     `${p}${c.length > 1 ? ` ${c}` : ''}`
   ))
 }
+
+// Main
+// extractBlocks('./img.png')
+  // .then(console.log)
