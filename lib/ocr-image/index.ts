@@ -7,7 +7,7 @@ const ocrConfig = {
   tsv: true,
 }
 
-export async function extractBlocks(image) {
+export default async function extractBlocks(image) {
   try {
     const tsv = await recognize(image, ocrConfig)
     const blocks = transform(tsv)
@@ -16,24 +16,31 @@ export async function extractBlocks(image) {
         ...block,
         text: filter(block.text)
       }))
-    const sumarized = strip
+    console.log('strip', strip)
+    const summarized = strip
       .filter(block => (
         block.text !== ''
       ))
-    return sumarized
+    return summarized
   } catch (err) {
-    console.log(err.message)
+    console.error('Failed to extract text blocks from image', err.message)
   }
 }
 
 function transform(tsv) {
   const data = tsv.slice(1)
     return data.map(row => ({
-      left: row[6],
-      top: row[7],
-      width: row[8],
-      height: row[9],
+      left: parseInt(row[6], 10),
+      top: parseInt(row[7], 10),
+      width: parseInt(row[8], 10),
+      height: parseInt(row[9], 10),
       text: row[11],
+  })).map(row => ({
+    ...row,
+    center: [
+      row.left + row.width / 2,
+      row.top + row.height / 2
+    ],
   }))
 }
 
@@ -46,6 +53,5 @@ function filter(txt) {
   ))
 }
 
-// Main
-// extractBlocks('./img.png')
-  // .then(console.log)
+// extractBlocks('../navigate-web/hi.png')
+//   .then(console.log)
