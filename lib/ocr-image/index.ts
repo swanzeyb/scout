@@ -1,11 +1,10 @@
 import { recognize } from 'node-tesseract-ocr'
-import sharp from 'sharp'
-import { writeFileSync } from 'fs'
+import { writeFileSync, readFileSync } from 'fs'
+import preprocess from './preprocess'
 
-const debug = false
 const ocrConfig = {
   psm: 11,
-  debug,
+  debug: true,
   tsv: true,
 }
 const viewport = {
@@ -13,40 +12,12 @@ const viewport = {
   height: 667,
 }
 
-export async function extractTextBlocks(image) {
-  const input = await preprocessImage(image)
+export default async function extractTextBlocks(image) {
+  const input = await preprocess(image, viewport)
+  // writeFileSync('./output.png', input)
   const tsv = await recognize(input, ocrConfig)
   const blocks = transform(tsv)
   return blocks
-}
-
-async function preprocessImage(input) {
-  const { width, height } = viewport
-  const process = await sharp(input)
-    .greyscale()
-    .resize(width, height)
-    .png()
-    .toBuffer()
-  const canvas = await createCanvas(width, height, 20)
-  const output = await canvas
-    .composite([{ input: process }])
-    .png()
-    .toBuffer()
-
-  debug && writeFileSync('./output.png', output)
-  return output
-}
-
-async function createCanvas(width, height, border) {
-  return await sharp({
-    create: {
-      width: width + border * 2,
-      height: height + border * 2,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 1 },
-    }
-  })
-  .withMetadata({ density: 72 })
 }
 
 function transform(tsv) {
@@ -92,15 +63,9 @@ function transform(tsv) {
   return blocks
 }
 
-function filter(txt) {
-  const alpha = txt.replace(/[^a-zA-Z]/g, ' ')
-  const reduce = alpha.replace(/\s\s+/g, ' ')
-  const tokens = reduce.split(' ')
-  const combine = tokens.reduce((p, c) => (
-    `${p}${c.length > 1 ? ` ${c}` : ''}`
-  ))
-  return combine.trim()
-}
-
-extractTextBlocks('../navigate-web/yeet.png')
-  .then(console.log)
+const testImg = readFileSync('../navigate-web/yeet.png')
+extractTextBlocks(testImg)
+  .then(blocks => {
+    console.log(blocks, 'has log in?')
+    console.log(blocks.some(block => block.text.includes('Log In')))
+  })
