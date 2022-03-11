@@ -12,6 +12,8 @@
     "nodemon": "^2.0.15"
   },
   "dependencies": {
+    "debounce": "^1.2.1",
+    "normalize-url": "^7.0.3",
     "puppeteer": "^13.4.1"
   }
 }
