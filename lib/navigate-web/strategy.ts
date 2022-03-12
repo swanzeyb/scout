@@ -36,9 +36,9 @@ async function createParsers(page, root, context) {
   return {
     'goto': (url) => translateUrl(url, root),
     'click': (target) => {
-      const resultIndex = blocks
+      const resultIndex = context
         .findIndex(block => block.text.includes(target))
-      return blocks[resultIndex].center
+      return context[resultIndex].center
     },
   }
 }
@@ -49,8 +49,8 @@ function parseQuery(query) {
   return [method, payload]
 }
 
-async function executeSteps(page, context, instruction) {
-  const { root, steps } = instruction
+async function executeSteps(page, context, strategy) {
+  const { root, steps } = strategy
   const methods = await createMethods(page)
   const parsers = await createParsers(page, root, context)
 
@@ -69,27 +69,15 @@ async function executeSteps(page, context, instruction) {
   }
 }
 
-export async function playStrategy(page, strategy) {
-  for (let i = 0; i < strategy.length; i++) {
-    const instruction = strategy[i];
-    await page.waitForNetworkIdle()
-    const context = await wordBlocks(page)
-    console.log(context, 'context')
-    await executeSteps(page, context, instruction)
-    await page.waitForNetworkIdle()
-  }
+export async function playStrategy(page, context, strategy) {
+  await executeSteps(page, context, strategy)
+  await page.waitForNetworkIdle()
 }
 
-export function createStrategy(site, map) {
+export function createStrategy(site, steps) {
   const root = normalizeUrl(site)
-  const routes = Object.keys(map)
-  const steps = Object.values(map)
-
-  return routes.map((route, i) => {
-    return {
-      root,
-      url: translateUrl(route, root),
-      steps: steps[i],
-    }
-  })
+  return {
+    root,
+    steps,
+  }
 }
