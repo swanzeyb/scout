@@ -13,9 +13,10 @@ const viewport = {
 }
 
 export default async function extractTextBlocks(image) {
-  const input = await preprocess(image, viewport)
-  // writeFileSync('./output.png', input)
-  const tsv = await recognize(input, ocrConfig)
+  writeFileSync('./input.png', image)
+  const output = await preprocess(image)
+  writeFileSync('./output.png', output)
+  const tsv = await recognize(output, ocrConfig)
   const blocks = transform(tsv)
   return blocks
 }
@@ -63,9 +64,9 @@ function transform(tsv) {
   return blocks
 }
 
-const testImg = readFileSync('../navigate-web/yeet.png')
-extractTextBlocks(testImg)
-  .then(blocks => {
-    console.log(blocks, 'has log in?')
-    console.log(blocks.some(block => block.text.includes('Log In')))
-  })
+// const testImg = readFileSync('../navigate-web/uhm.png')
+// extractTextBlocks(testImg)
+//   .then(blocks => {
+//     console.log(blocks, 'has log in?')
+//     console.log(blocks.some(block => block.text.includes('Log In')))
+//   })

@@ -39,7 +39,7 @@ async function fetchInfo() {
   }, EVAL_DEBOUNCE_DELAY)
 
   page.on('framenavigated', evalContext)
-  playStrategy(page, contextMap['inital'])
+  await playStrategy(page, contextMap['inital'])
 }
 
 fetchInfo()

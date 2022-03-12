@@ -1,11 +1,11 @@
 import { spawn } from 'child_process'
 
-export default function preprocess(image, resize): Promise<Buffer> {
+export default function preprocess(image): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const child = spawn('python3', [
-      'preprocess.py',
-      resize.width,
-      resize.height,
+      '/Users/swanzeyb/scout/lib/ocr-image/preprocess.py'
+      // resize.width,
+      // resize.height,
     ])
 
     child.stdin.write(image, err => {

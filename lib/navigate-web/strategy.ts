@@ -2,6 +2,7 @@ import normalizeUrl from 'normalize-url'
 import extractTextBlocks from 'ocr-image'
 import { createSession } from './browser'
 import { debounce } from 'debounce'
+import { writeFileSync } from 'fs'
 
 const NAV_DEBOUNCE_DELAY = 600
 
@@ -31,8 +32,7 @@ async function createMethods(page) {
   }
 }
 
-async function createParsers(page, root) {
-  const blocks = await wordBlocks(page)
+async function createParsers(page, root, context) {
   return {
     'goto': (url) => translateUrl(url, root),
     'click': (target) => {
@@ -49,9 +49,10 @@ function parseQuery(query) {
   return [method, payload]
 }
 
-async function executeSteps(page, { root, steps }) {
+async function executeSteps(page, context, instruction) {
+  const { root, steps } = instruction
   const methods = await createMethods(page)
-  const parsers = await createParsers(page, root)
+  const parsers = await createParsers(page, root, context)
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
@@ -71,7 +72,10 @@ async function executeSteps(page, { root, steps }) {
 export async function playStrategy(page, strategy) {
   for (let i = 0; i < strategy.length; i++) {
     const instruction = strategy[i];
-    await executeSteps(page, instruction)
+    await page.waitForNetworkIdle()
+    const context = await wordBlocks(page)
+    console.log(context, 'context')
+    await executeSteps(page, context, instruction)
     await page.waitForNetworkIdle()
   }
 }
