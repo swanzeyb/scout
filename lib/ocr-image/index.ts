@@ -4,7 +4,7 @@ import preprocess from './preprocess'
 
 const ocrConfig = {
   psm: 11,
-  debug: true,
+  debug: false,
   tsv: true,
 }
 const viewport = {
@@ -14,7 +14,7 @@ const viewport = {
 
 export default async function extractTextBlocks(image) {
   writeFileSync('./input.png', image)
-  const output = await preprocess(image)
+  const output = await preprocess(image, viewport)
   writeFileSync('./output.png', output)
   const tsv = await recognize(output, ocrConfig)
   const blocks = transform(tsv)

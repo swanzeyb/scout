@@ -2,6 +2,10 @@ import sys
 import cv2 as cv
 import numpy as np
 
+# Resize result to
+toWidth = int(sys.argv[1])
+toHeight = int(sys.argv[2])
+
 # Load image from Node
 bytes = sys.stdin.buffer.read()
 nparr = np.frombuffer(bytes, np.uint8)
@@ -47,6 +51,10 @@ def invertBox(img, rect):
 for box in boxes:
   invertBox(img, box)
 
+# Resize result
+img = cv.resize(img, (toWidth, toHeight))
+
 # Send image back to Node
 imgBytes = cv.imencode('.png', img)[1].tobytes()
 sys.stdout.buffer.write(imgBytes)
+# cv.imwrite('hmm.png', img)
