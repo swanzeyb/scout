@@ -1,21 +1,13 @@
 import normalizeUrl from 'normalize-url'
 import extractTextBlocks from 'ocr-image'
-import { createSession } from './browser'
 import { debounce } from 'debounce'
-import { writeFileSync } from 'fs'
 
-const NAV_DEBOUNCE_DELAY = 600
+const EVAL_DEBOUNCE_DELAY = 1600
 
-enum PlayType {
-  Sequential,
-  Seek,
-}
-
-function translateUrl(url, root) {
+function translateUrl(url) {
   switch(url) {
     case 'start': return 'about:blank'
-    case 'root': return root
-    default: return `${root}/${url}`
+    default: return url
   }
 }
 
@@ -44,9 +36,9 @@ async function createMethods(page) {
   }
 }
 
-async function createParsers(page, root, context) {
+async function createParsers(context) {
   return {
-    'goto': (url) => translateUrl(url, root),
+    'goto': (url) => translateUrl(url),
     'click': (target) => targetToPoint(target, context),
   }
 }
@@ -57,10 +49,9 @@ function parseQuery(query) {
   return [method, payload]
 }
 
-async function executeSteps(page, context, strategy) {
-  const { root, steps } = strategy
+async function executeSteps(page, steps) {
   const methods = await createMethods(page)
-  const parsers = await createParsers(page, root, context)
+  const parsers = await createParsers(page)
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
@@ -77,15 +68,36 @@ async function executeSteps(page, context, strategy) {
   }
 }
 
-export async function playStrategy(page, context, strategy) {
-  await executeSteps(page, context, strategy)
-  await page.waitForNetworkIdle()
-}
+export function playStrategy(contextMap, page) {
+  return new Promise(async (resolve, reject) => {
+    let context:any = []
 
-export function createStrategy(site, steps) {
-  const root = normalizeUrl(site)
-  return {
-    root,
-    steps,
-  }
+    const evalContext = debounce(async () => {
+      context = await wordBlocks(page)
+      const keywords = Object.keys(contextMap)
+  
+      let executed = false
+      for (let i = 1; i < keywords.length; i++) {
+        const keyword = keywords[i]
+        const hasKeyword = context.some(block => (
+          block.text.includes(keyword)
+        ))
+  
+        if (hasKeyword) {
+          executed = true
+          executeSteps(page, contextMap[keyword])
+            .catch(reject)
+        }
+      }
+  
+      if (!executed) {
+        console.log('No strategy found to play in this context')
+        resolve(null)
+      }
+    }, EVAL_DEBOUNCE_DELAY)
+  
+    page.on('framenavigated', evalContext)
+    executeSteps(page, contextMap['inital'])
+      .catch(reject)
+  })
 }
