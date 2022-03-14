@@ -31,7 +31,7 @@ for rect in rects:
   if level < 180:
     img = colors.invertSection(img, rect)
 
-Resize result
+# Resize result
 img = cv.resize(img, (toWidth, toHeight))
 
 # Send image back to Node

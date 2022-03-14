@@ -2,6 +2,8 @@ import { recognize } from 'node-tesseract-ocr'
 import { writeFileSync, readFileSync } from 'fs'
 import preprocess from './preprocess'
 
+const debug = true
+
 const ocrConfig = {
   psm: 11,
   debug: false,
@@ -13,9 +15,9 @@ const viewport = {
 }
 
 export default async function extractTextBlocks(image) {
-  writeFileSync('./input.png', image)
+  if (debug) writeFileSync('./debug/input.png', image)
   const output = await preprocess(image, viewport)
-  writeFileSync('./output.png', output)
+  if (debug) writeFileSync('./debug/output.png', output)
   const tsv = await recognize(output, ocrConfig)
   const blocks = transform(tsv)
   return blocks

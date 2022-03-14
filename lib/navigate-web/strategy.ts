@@ -19,6 +19,17 @@ function translateUrl(url, root) {
   }
 }
 
+function targetToPoint(target, context) {
+  const location = context
+    .findIndex(block => block.text.includes(target))
+  console.log('CLICK HERE', location, context[location]?.center)
+  if (location === -1) {
+    throw new Error('Target not found in context')
+  } else {
+    return context[location].center
+  }
+}
+
 export async function wordBlocks(page) {
   const screenImg = await page.screenshot()
   const words = await extractTextBlocks(screenImg)
@@ -29,17 +40,14 @@ async function createMethods(page) {
   return {
     'goto': (url) => page.goto(url),
     'click': (point) => page.mouse.click(point[0], point[1]),
+    'type': (text) => page.keyboard.type(text, { delay: 100 })
   }
 }
 
 async function createParsers(page, root, context) {
   return {
     'goto': (url) => translateUrl(url, root),
-    'click': (target) => {
-      const resultIndex = context
-        .findIndex(block => block.text.includes(target))
-      return context[resultIndex].center
-    },
+    'click': (target) => targetToPoint(target, context),
   }
 }
 

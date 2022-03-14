@@ -1,5 +1,7 @@
 /node_modules
 /build
+/debug
+__pycache__
 
 ### macOS ###
 # General
