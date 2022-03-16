@@ -1,8 +1,6 @@
 import puppeteer from 'puppeteer'
 
 const DEFAULT_TIMEOUT = 1000 * 60 * 5
-
-const LOCAL_PATH = { executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' }
 const dataDirRoot = './profiles'
 const viewPort = {
   width: 375,
@@ -10,24 +8,9 @@ const viewPort = {
   deviceScaleFactor: 4,
 }
 
-export function createPersona() {
-  const persona = {
-    // proxy: {
-    //   ip: 'x.x.x.x',
-    //   port: '3000',
-    // },
-    name: {
-      first: 'Lily',
-      last: 'Horner',
-    },
-    birthday: {
-      day: 1,
-      month: 1,
-      year: 2001,
-    },
-    email: 'lilyhorner',
-    username: 'lilyhorner',
-    password: '',
+export function createConfig(profileName) {
+  const userAgent = 'Mozilla/5.0 (Linux; Android 11; BE2026) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.101 Mobile Safari/537.36'
+  return {
     hints: {
       'sec-ch-ua':                   `" Not A;Brand";v="99", "Chromium";v="99", "Google Chrome";v="99"`,
       'sec-ch-ua-platform':          'Android',
@@ -44,36 +27,48 @@ export function createPersona() {
       'rtt':                         '150',
       'dpr':                         '2.8125',
     },
-    userAgent: 'Mozilla/5.0 (Linux; Android 11; BE2026) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.101 Mobile Safari/537.36',
-  }
-
-  return {
-    ...persona,
     browser: {
-      userDataDir: `${dataDirRoot}/${persona.name.first}-${persona.name.last}`
+      userDataDir: `${dataDirRoot}/${profileName}`,
+      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     },
-    arguments: [
-      `--user-agent=${persona.userAgent}`,
+    args: [
+      // Required for Docker:
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      // Mobile args:
+      '--use-mobile-user-agent',
+      '--top-controls-show-threshold=0.5',
+      '--top-controls-hide-threshold=0.5 ',
+      '--use-mobile-user-agent',
+      '--enable-viewport',
+      '--validate-input-event-stream',
+      '--enable-longpress-drag-selection',
+      '--touch-selection-strategy=direction',
+      '--main-frame-resizes-are-orientation-changes',
+      '--disable-composited-antialiasing',
+      '--enable-dom-distiller',
+      '--flag-switches-begin',
+      '--flag-switches-end',
+      '--origin-trial-disabled-features=ConditionalFocus',
+      '--top-controls-show-threshold=0.5',
+      '--top-controls-hide-threshold=0.5',
+      // Misc:
+      `--window-size=${viewPort.width},${viewPort.height + 40}`,
+      `--user-agent=${userAgent}`,
     ],
   }
 }
 
-function overrideClientHints(request, persona) {
+function overrideClientHints(request, hints) {
   const headers = request.headers()
   const keys = Object.keys(headers)
-  const toOverride = Object.keys(persona.hints)
-
+  const toOverride = Object.keys(hints)
   const override = {}
   keys.forEach(key => {
     if (toOverride.includes(key)) {
-      override[key] = persona.hints[key]
+      override[key] = hints[key]
     }
-  })
-  console.log('SETTING', {
-    headers: {
-      ...headers,
-      ...override,
-    },
   })
   request.continue({
     headers: {
@@ -83,60 +78,25 @@ function overrideClientHints(request, persona) {
   })
 }
 
-export async function createBrowser(persona) {
-  const args = [
-    // Required for Docker:
-    '--no-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-gpu',
-    // Mobile args:
-    '--use-mobile-user-agent',
-    '--top-controls-show-threshold=0.5',
-    '--top-controls-hide-threshold=0.5 ',
-    '--use-mobile-user-agent',
-    '--enable-viewport',
-    '--validate-input-event-stream',
-    '--enable-longpress-drag-selection',
-    '--touch-selection-strategy=direction',
-    '--main-frame-resizes-are-orientation-changes',
-    '--disable-composited-antialiasing',
-    '--enable-dom-distiller',
-    '--flag-switches-begin',
-    '--flag-switches-end',
-    '--origin-trial-disabled-features=ConditionalFocus',
-    '--top-controls-show-threshold=0.5',
-    '--top-controls-hide-threshold=0.5',
-    // Misc:
-    `--window-size=${viewPort.width},${viewPort.height + 40}`,
-    ...persona.arguments,
-  ]
-
-  const browserConfig = {
+export async function createBrowser(config) {
+  const browser = await puppeteer.launch({
     defaultViewport: {
       isMobile: true,
       hasTouch: true,
       ...viewPort,
     },
     headless: false,
-    ...LOCAL_PATH,
-    ...persona.browser,
-    args,
-  }
-
-  const browser = await puppeteer.launch(browserConfig)
-  const page = await browser.newPage()
-  page.setDefaultTimeout(DEFAULT_TIMEOUT)
-
-  await page.setRequestInterception(true)
-  page.on('request', request => {
-    overrideClientHints(request, persona)
+    args: config.args,
+    ...config.browser,
   })
 
-  const session = {
-    on: (event, calback) => null,
-    page,
-    browser,
-  }
+  const page = await browser.newPage()
+  page.setDefaultTimeout(DEFAULT_TIMEOUT)
+  await page.setRequestInterception(true)
 
-  return session
+  page.on('request', request => {
+    overrideClientHints(request, config.hints)
+  })
+
+  return { page, browser }
 }

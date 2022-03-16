@@ -25,7 +25,7 @@ function targetToPoint(target, context) {
   }
 }
 
-export async function wordBlocks(page) {
+async function wordBlocks(page) {
   const screenImg = await page.screenshot()
   const words = await extractTextBlocks(screenImg)
   return words
@@ -35,7 +35,8 @@ async function createMethods(page) {
   return {
     'goto': (url) => page.goto(url),
     'click': (point) => page.mouse.click(point[0], point[1]),
-    'type': (text) => page.keyboard.type(text, { delay: randomInt(60, 120) })
+    'type': (text) => page.keyboard.type(text, { delay: randomInt(60, 120) }),
+    'idle': () => null,
   }
 }
 
@@ -100,7 +101,7 @@ export function playStrategy(contextMap, page) {
     }, EVAL_DEBOUNCE_DELAY)
   
     page.on('framenavigated', evalContext)
-    executeSteps(page, contextMap['inital'])
+    executeSteps(page, contextMap['start'])
       .catch(reject)
   })
 }
