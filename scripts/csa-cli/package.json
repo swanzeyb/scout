@@ -1,0 +1,17 @@
+{
+  "name": "csa-cli",
+  "version": "1.0.0",
+  "main": "bin/cli.js",
+  "bin": {
+    "create-scout-app": "./bin/cli.js"
+  },
+  "license": "MIT",
+  "private": true,
+  "devDependencies": {
+    "nodemon": "^2.0.15"
+  },
+  "scripts": {
+    "start": "nodemon index.ts",
+    "build": "tsc"
+  }
+}
