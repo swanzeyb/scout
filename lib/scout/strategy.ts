@@ -1,4 +1,3 @@
-import normalizeUrl from 'normalize-url'
 import extractTextBlocks from 'ocr-image'
 import { debounce } from 'debounce'
 
@@ -9,6 +8,10 @@ function translateUrl(url) {
     case 'start': return 'about:blank'
     default: return url
   }
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1) + min)
 }
 
 function targetToPoint(target, context) {
@@ -32,7 +35,7 @@ async function createMethods(page) {
   return {
     'goto': (url) => page.goto(url),
     'click': (point) => page.mouse.click(point[0], point[1]),
-    'type': (text) => page.keyboard.type(text, { delay: 100 })
+    'type': (text) => page.keyboard.type(text, { delay: randomInt(60, 120) })
   }
 }
 
