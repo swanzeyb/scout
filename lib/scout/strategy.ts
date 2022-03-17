@@ -31,31 +31,47 @@ async function wordBlocks(page) {
   return words
 }
 
-async function createMethods(page) {
+function createMethods(page) {
   return {
-    'goto': (url) => page.goto(url),
-    'click': (point) => page.mouse.click(point[0], point[1]),
-    'type': (text) => page.keyboard.type(text, { delay: randomInt(60, 120) }),
-    'idle': () => null,
+    'goto':        (url) => page.goto(url),
+    'click':       (point) => page.mouse.click(point[0], point[1]),
+    'click below': (point) => page.mouse.click(point[0], point[1] + 20),
+    'type':        (text) => page.keyboard.type(text, { delay: randomInt(60, 120) }),
+    'idle':        () => null,
   }
 }
 
-async function createParsers(context) {
+function createParsers(context) {
   return {
-    'goto': (url) => translateUrl(url),
-    'click': (target) => targetToPoint(target, context),
+    'goto':        (url) => translateUrl(url),
+    'click':       (target) => targetToPoint(target, context),
+    'click below': (target) => targetToPoint(target, context),
   }
 }
 
 function parseQuery(query) {
-  const [method] = query.split(' ')
-  const payload = query.slice(method.length + 1)
-  return [method, payload]
+  const methods = Object.keys(createMethods({}))
+  const length = query.split(' ').length
+
+  for (let i = 0; i < length; i++) {
+    const parts = query.split(' ')
+    Array(i).fill(0)
+      .forEach(_ => parts.pop())
+    const segment = parts.join(' ')
+
+    if (methods.includes(segment)) {
+      const method = segment
+      const payload = query.slice(method.length + 1)
+      return [method, payload]
+    }
+  }
+
+  throw new Error(`No method found for query ${query}`)
 }
 
-async function executeSteps(page, steps) {
-  const methods = await createMethods(page)
-  const parsers = await createParsers(page)
+export async function executeSteps(page, steps, context) {
+  const methods = createMethods(page)
+  const parsers = createParsers(context)
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
@@ -89,7 +105,7 @@ export function playStrategy(contextMap, page) {
   
         if (hasKeyword) {
           executed = true
-          executeSteps(page, contextMap[keyword])
+          executeSteps(page, contextMap[keyword], context)
             .catch(reject)
         }
       }
@@ -101,7 +117,7 @@ export function playStrategy(contextMap, page) {
     }, EVAL_DEBOUNCE_DELAY)
   
     page.on('framenavigated', evalContext)
-    executeSteps(page, contextMap['start'])
+    executeSteps(page, contextMap['start'], context)
       .catch(reject)
   })
 }
