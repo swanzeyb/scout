@@ -1,6 +1,10 @@
+import { Buffer } from 'buffer'
 import puppeteer from 'puppeteer'
+import extractTextBlocks from 'ocr-image'
+import { wait } from './utils'
 
 const DEFAULT_TIMEOUT = 1000 * 60 * 5
+const debug = false
 const dataDirRoot = './profiles'
 const viewPort = {
   width: 375,
@@ -85,7 +89,7 @@ export async function createBrowser(config) {
       hasTouch: true,
       ...viewPort,
     },
-    headless: false,
+    headless: !debug,
     args: config.args,
     ...config.browser,
   })
@@ -99,4 +103,25 @@ export async function createBrowser(config) {
   })
 
   return { page, browser }
+}
+
+export async function* textContext(page, evalDelay=0) {
+  let done = false
+  let last = Buffer.alloc(0)
+  page.on('close', () => ( done = true ))
+
+  try {
+    while (!done) {
+      const screenImg = await page.screenshot()
+      if (Buffer.compare(last, screenImg) !== 0) {
+        last = screenImg
+        yield await extractTextBlocks(screenImg)
+      } else {
+        yield []
+      }
+      await wait(evalDelay)
+    }
+  } finally {
+    return
+  }
 }

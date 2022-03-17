@@ -15,11 +15,13 @@ const viewport = {
 }
 
 export default async function extractTextBlocks(image) {
+  console.time('extractTextBlocks')
   if (debug) writeFileSync('./debug/input.png', image)
   const output = await preprocess(image, viewport)
   if (debug) writeFileSync('./debug/output.png', output)
   const tsv = await recognize(output, ocrConfig)
   const blocks = transform(tsv)
+  console.timeEnd('extractTextBlocks')
   return blocks
 }
 
