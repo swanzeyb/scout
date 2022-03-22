@@ -2,7 +2,12 @@ import { Buffer } from 'buffer'
 import puppeteer from 'puppeteer'
 import extractTextBlocks from 'ocr-image'
 import { executeSteps } from './strategy'
+import { wait } from './utils'
+import { createIdentity } from './identity'
 
+/*
+  @ Browser Creation
+*/
 const DEFAULT_TIMEOUT = 1000 * 60 * 5
 const debug = true
 const dataDirRoot = './profiles'
@@ -106,6 +111,9 @@ export async function createBrowser(config) {
   return { page, browser }
 }
 
+/*
+  @ Context Report Generators
+*/
 export async function* textContext(page, evalDelay=0) {
   let done = false
   let last = Buffer.alloc(0)
@@ -130,6 +138,9 @@ export async function* textContext(page, evalDelay=0) {
   }
 }
 
+/*
+  @ Strategy Execution
+*/
 function translateUrl(url) {
   switch(url) {
     case 'start': return 'about:blank'
@@ -175,4 +186,38 @@ export async function executeStrategy(page, steps, context) {
   const methods = createMethods(page)
   const parsers = createParsers(context)
   await executeSteps(steps, methods, parsers)
+}
+
+/*
+  @ Context Evaluation Loop
+*/
+const EVAL_LOOP_DELAY = 1000 * 1
+
+export default async function browser(App) {
+  // Note to self, change config profileName if trying to use a different identity
+  const config = createConfig('lily-horner')
+  const { device } = createIdentity()
+
+  config.hints['sec-ch-ua-platform'] = device.platform
+  config.hints['sec-ch-ua-platform-version'] = device.platformVersion
+  config.hints['sec-ch-ua-model'] = device.model
+  config.hints['device-memory'] = device.memory
+
+  const { page } = await createBrowser(config)
+  const getTexts = textContext(page, EVAL_LOOP_DELAY)
+
+  // Initialize App Root
+  App()
+
+  // On Mount
+  await App({ page, texts: [] })
+  
+  // On Update
+  for await (const texts of getTexts) {
+    console.log('Begin Eval Iteration', texts.map(block => block.text))
+    await App({ page, texts })
+    await wait(10000)
+  }
+
+  console.log('Done')
 }
