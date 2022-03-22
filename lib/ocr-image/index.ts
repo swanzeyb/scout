@@ -9,12 +9,13 @@ const ocrConfig = {
   debug: false,
   tsv: true,
 }
-const viewport = {
-  width: 375,
-  height: 667,
+
+interface Viewport {
+  width: Number,
+  height: Number,
 }
 
-export default async function extractTextBlocks(image) {
+export default async function extractTextBlocks(image: Buffer, viewport: Viewport) {
   console.time('extractTextBlocks')
   if (debug) writeFileSync('./debug/input.png', image)
   const output = await preprocess(image, viewport)
