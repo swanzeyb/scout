@@ -1,10 +1,10 @@
 import { Buffer } from 'buffer'
 import puppeteer from 'puppeteer'
 import extractTextBlocks from 'ocr-image'
-import { wait } from './utils'
+import { executeSteps } from './strategy'
 
 const DEFAULT_TIMEOUT = 1000 * 60 * 5
-const debug = false
+const debug = true
 const dataDirRoot = './profiles'
 const viewPort = {
   width: 375,
@@ -14,6 +14,7 @@ const viewPort = {
 
 export function createConfig(profileName) {
   const userAgent = 'Mozilla/5.0 (Linux; Android 11; BE2026) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.101 Mobile Safari/537.36'
+  // const userAgent = 'Mozilla/5.0 (Linux; Android 9; moto e6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.73 Mobile Safari/537.36'
   return {
     hints: {
       'sec-ch-ua':                   `" Not A;Brand";v="99", "Chromium";v="99", "Google Chrome";v="99"`,
@@ -112,7 +113,10 @@ export async function* textContext(page, evalDelay=0) {
 
   try {
     while (!done) {
-      const screenImg = await page.screenshot()
+      const screenImg = await page.screenshot({
+        fullPage: true,
+        captureBeyondViewport: false,
+      })
       if (Buffer.compare(last, screenImg) !== 0) {
         last = screenImg
         yield await extractTextBlocks(screenImg)
@@ -124,4 +128,51 @@ export async function* textContext(page, evalDelay=0) {
   } finally {
     return
   }
+}
+
+function translateUrl(url) {
+  switch(url) {
+    case 'start': return 'about:blank'
+    default: return url
+  }
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1) + min)
+}
+
+function targetToPoint(target, context) {
+  const location = context
+    .findIndex(block => block.text.includes(target))
+  console.log('CLICK HERE', location, context[location]?.center)
+  if (location === -1) {
+    const msg = `Target: ${target} not found in context`
+    throw new Error(msg)
+  } else {
+    return context[location].center
+  }
+}
+
+function createMethods(page) {
+  return {
+    'goto':        (url) => page.goto(url),
+    'click':       (point) => page.mouse.click(point[0], point[1]),
+    'click below': (point) => page.mouse.click(point[0], point[1] + 20),
+    'type':        (text) => page.keyboard.type(text, { delay: randomInt(60, 120) }),
+    'idle':        () => null,
+  }
+}
+
+function createParsers(context) {
+  return {
+    'goto':        (url) => translateUrl(url),
+    'click':       (target) => targetToPoint(target, context),
+    'click below': (target) => targetToPoint(target, context),
+  }
+}
+
+export async function executeStrategy(page, steps, context) {
+  const methods = createMethods(page)
+  const parsers = createParsers(context)
+  await executeSteps(steps, methods, parsers)
 }

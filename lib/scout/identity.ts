@@ -17,30 +17,30 @@ function generatePassword() {
 export function createIdentity() {
   return {
     name: {
-      first: 'Lily',
-      last: 'Horner',
+      first: 'Alexia',
+      last: 'Wooten',
     },
     pi: {
       birthday: {
         mm: 6,
-        dd: 28,
+        dd: 9,
         yyyy: 2000,
       },
     },
     contact: {
-      email: 'lilyhorner176@gmail.com',
-      phone: '',
+      email: 'wootenalexia7@gmail.com',
+      phone: '9866008680',
     },
     account: {
       password: 'tDLvdQpxdka-Tw2y',
     },
     device: {
-      userAgent: '',
-      platform: '',
-      platformVersion: '',
-      model: '',
+      userAgent: 'Mozilla/5.0 (Linux; Android 9; moto e6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.73 Mobile Safari/537.36',
+      platform: 'Android',
+      platformVersion: '9.0.0',
+      model: 'moto e6',
       arch: '',
-      memory: '',
+      memory: '2',
     },
   }
 }

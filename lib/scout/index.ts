@@ -1,23 +1,23 @@
+export { createIdentity } from './identity'
+
 import { createBrowser, createConfig, textContext } from './browser'
 import { executeSteps } from './strategy'
+import { createIdentity } from './identity'
+import { wait } from './utils'
 
-const EVAL_LOOP_DELAY = 1000
+const EVAL_LOOP_DELAY = 1000 * 1
 
-const effects: any = new Set()
-
-function useEffect(effect) {
-  effects.add(effect)
-}
+const mount: any = new Set()
+const update: any = new Set()
 
 export function useStart(then) {
-  useEffect(async ({ page, texts }) => {
+  mount.add(async ({ page, texts }) => {
     await executeSteps(page, then, texts)
   })
 }
 
 export function useTexts(has, then) {
-  useEffect(async ({ page, texts }) => {
-    console.log('args', page, texts)
+  update.add(async ({ page, texts }) => {
     const hasKeyword = texts.some(block => (
       block.text.includes(has)
     ))
@@ -27,8 +27,15 @@ export function useTexts(has, then) {
   })
 }
 
-export async function start(App) {
+export async function startAndroid(App) {
   const config = createConfig('lily-horner')
+  const { device } = createIdentity()
+
+  config.hints['sec-ch-ua-platform'] = device.platform
+  config.hints['sec-ch-ua-platform-version'] = device.platformVersion
+  config.hints['sec-ch-ua-model'] = device.model
+  config.hints['device-memory'] = device.memory
+
   const { page } = await createBrowser(config)
   const evalTexts = textContext(page, EVAL_LOOP_DELAY)
 
@@ -36,19 +43,55 @@ export async function start(App) {
   App()
 
   // On Mount
-  for (const effect of effects) {
+  for (const effect of mount) {
     await effect({ page, texts: [] })
   }
   
   // On Update
   for await (const texts of evalTexts) {
-    for (const effect of effects) {
+    console.log('Begin Eval Iteration', texts.map(block => block.text))
+    for (const effect of update) {
       await effect({
         page,
         texts,
       })
     }
-    console.log('texts', texts.length)
+    await wait(10000)
+  }
+
+  console.log('Done')
+}
+
+export async function start(App) {
+  const config = createConfig('lily-horner')
+  const { device } = createIdentity()
+
+  config.hints['sec-ch-ua-platform'] = device.platform
+  config.hints['sec-ch-ua-platform-version'] = device.platformVersion
+  config.hints['sec-ch-ua-model'] = device.model
+  config.hints['device-memory'] = device.memory
+
+  const { page } = await createBrowser(config)
+  const evalTexts = textContext(page, EVAL_LOOP_DELAY)
+
+  // Initialize App Root
+  App()
+
+  // On Mount
+  for (const effect of mount) {
+    await effect({ page, texts: [] })
+  }
+  
+  // On Update
+  for await (const texts of evalTexts) {
+    console.log('Begin Eval Iteration', texts.map(block => block.text))
+    for (const effect of update) {
+      await effect({
+        page,
+        texts,
+      })
+    }
+    await wait(10000)
   }
 
   console.log('Done')
