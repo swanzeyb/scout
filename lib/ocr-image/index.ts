@@ -1,8 +1,10 @@
 import { recognize } from 'node-tesseract-ocr'
 import { writeFileSync, readFileSync } from 'fs'
 import preprocess from './preprocess'
+import { drawRects } from 'scout'
 
-const debug = true
+const ENV_PROD = process.env.NODE_ENV !== 'development'
+const ENV_DEV = !ENV_PROD
 
 const ocrConfig = {
   psm: 11,
@@ -16,13 +18,14 @@ interface Viewport {
 }
 
 export default async function extractTextBlocks(image: Buffer, viewport: Viewport) {
-  console.time('extractTextBlocks')
-  if (debug) writeFileSync('./debug/input.png', image)
+  if (ENV_DEV) console.time('extractTextBlocks')
+  if (ENV_DEV) writeFileSync('./debug/input.png', image)
   const output = await preprocess(image, viewport)
-  if (debug) writeFileSync('./debug/output.png', output)
+  if (ENV_DEV) writeFileSync('./debug/output.png', output)
   const tsv = await recognize(output, ocrConfig)
   const blocks = transform(tsv)
-  console.timeEnd('extractTextBlocks')
+  if (ENV_DEV) drawRects('./debug/output.png', blocks.map(block => ({ ...block, text: undefined })))
+  if (ENV_DEV) console.timeEnd('extractTextBlocks')
   return blocks
 }
 
