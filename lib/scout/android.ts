@@ -1,9 +1,9 @@
-import Adb, {
-  DeviceClient,
-} from '@devicefarmer/adbkit'
+import Adb, { DeviceClient } from '@devicefarmer/adbkit'
 import { Buffer } from 'buffer'
 import { streamToBuffer, wait } from './utils'
 import extractTextBlocks from 'ocr-image'
+import isEqual from 'lodash/isEqual'
+import { executeSteps, targetToPoint } from './strategy'
 
 /*
   @ Android ADB Creation
@@ -11,8 +11,13 @@ import extractTextBlocks from 'ocr-image'
 const adb = Adb.createClient()
 
 export class Device extends DeviceClient {
+  public resolution
+
   constructor(client, serial) {
     super(client, serial)
+    this.getResolution().then(res => {
+      this.resolution = res
+    })
   }
 
   getResolution() {
@@ -29,33 +34,103 @@ export class Device extends DeviceClient {
         }
       })
   }
+
+  togglePower() {
+    return this.shell('input keyevent 26')
+  }
+
+  tap(x, y) {
+    return this.shell(`input tap ${x} ${y}`)
+  }
+
+  swipe(x1, y1, x2, y2) {
+    return this.shell(`input touchscreen swipe ${x1} ${y1} ${x2} ${y2}`)
+  }
+
+  goBack() {
+    const x = (this.resolution.width / 3) - 20
+    const y = this.resolution.height - 20
+    return this.tap(x, y)
+  }
+
+  goHome() {
+    const x = this.resolution.width / 2
+    const y = this.resolution.height - 20
+    return this.tap(x, y)
+  }
+
+  openTasker() {
+    const x = this.resolution.width - ((this.resolution.width / 3) + 20)
+    const y = this.resolution.height - 20
+    return this.tap(x, y)
+  }
 }
 
 /*
   @ Context Report Generators
 */
 export async function* textContext(device: Device, resolution, delay) {
-  let last = Buffer.alloc(0)
+  const last = {
+    cap: Buffer.alloc(0),
+    texts: [],
+  }
 
   while (true) {
+    console.time('Eval Loop')
     await wait(delay)
     const cap = await device.screencap()
       .then(streamToBuffer)
 
-    if (Buffer.compare(last, cap) !== 0) {
-      last = cap
-      yield await extractTextBlocks(cap, resolution)
+    if (Buffer.compare(last.cap, cap) !== 0) {
+      last.cap = cap
+      const texts = await extractTextBlocks(cap, resolution)
+      if (!isEqual(last.texts, texts)) {
+        last.texts = texts
+        yield texts
+      } 
     }
-    
-    console.count('Ran Eval Loop')
+
+    console.timeEnd('Eval Loop')
   }
 }
 
 /*
   @ Strategy Execution
 */
-export async function executeStrategy() {
-  
+function createMethods(device) {
+  return {
+    'tap':         (pt) => device.tap(pt[0], pt[1]),
+    'tap above':   (pt) => device.tap(pt[0], pt[1] + 20),
+    'tap below':   (pt) => device.tap(pt[0], pt[1] - 20),
+    'tap home':    () => device.goHome(),
+    'tap back':    () => device.goBack(),
+    'tap windows': () => device.openTasker(),
+    'wait':        (amt) => wait(amt),
+  }
+}
+
+function createParsers(device, text) {
+  return {
+    'tap':        (target) => targetToPoint(target, text),
+    'tap above':  (target) => targetToPoint(target, text),
+    'tap below':  (target) => targetToPoint(target, text),
+    'wait':       (amount) => Number(amount),
+  }
+}
+
+export async function executeStrategy(device, text, strategy) {
+  const methods = createMethods(device)
+  const parsers = createParsers(device, text)
+
+  const keywords = Object.keys(strategy).entries()
+  for (const [_, keyword] of keywords) {
+    const hasKeyword = text
+      .some(block => block.text.includes(keyword))
+    if (hasKeyword) {
+      const steps = strategy[keyword]
+      await executeSteps(steps, methods, parsers)
+    }
+  }
 }
 
 /*
@@ -72,16 +147,16 @@ export default async function android(App) {
   const deviceId = devices[0].id
   const device = new Device(adb.getDevice(deviceId), deviceId)
   const resolution = await device.getResolution()
-  const getTexts = textContext(device, resolution, EVAL_LOOP_DELAY)
+  const textReport = textContext(device, resolution, EVAL_LOOP_DELAY)
 
   // On Mount
-  await App({ device, texts: [] })
+  const app = await App({ device, text: [] })
+  await executeStrategy(device, [], app)
 
   // On Update
-  for await (const texts of getTexts) {
-    console.log('Run Apps', texts.map(block => block.text))
-    await App({ device, texts })
+  for await (const text of textReport) {
+    console.log('Run Apps', text.map(block => block?.text))
+    const app = await App({ device, text })
+    await executeStrategy(device, text, app)
   }
-
-  console.log('Done')
 }

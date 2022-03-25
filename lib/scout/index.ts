@@ -1,5 +1,13 @@
+export { drawRects } from './utils'
+
 // import browser from './browser'
 import android from './android'
+
+export function includesText(text, keyword, then) {
+  const hasKeyword = text
+    .text(block => block.text.includes(keyword))
+  if (hasKeyword) return then()
+}
 
 export enum Environment {
   BROWSER,

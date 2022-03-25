@@ -34,3 +34,20 @@ export async function executeSteps(steps, methods, parsers) {
     }
   }
 }
+
+
+export function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1) + min)
+}
+
+export function targetToPoint(target, context) {
+  const location = context
+    .findIndex(block => block.text.includes(target))
+  if (location === -1) {
+    const msg = `Target: ${target} not found in context`
+    throw new Error(msg)
+  } else {
+    const block = context[location]
+    return [block.left + 10, block.center[1]]
+  }
+}

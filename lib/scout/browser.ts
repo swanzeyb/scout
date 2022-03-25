@@ -1,7 +1,7 @@
 import { Buffer } from 'buffer'
 import puppeteer from 'puppeteer'
 import extractTextBlocks from 'ocr-image'
-import { executeSteps } from './strategy'
+import { executeSteps, targetToPoint, randomInt } from './strategy'
 import { wait } from './utils'
 import { createIdentity } from './identity'
 
@@ -145,22 +145,6 @@ function translateUrl(url) {
   switch(url) {
     case 'start': return 'about:blank'
     default: return url
-  }
-}
-
-function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1) + min)
-}
-
-function targetToPoint(target, context) {
-  const location = context
-    .findIndex(block => block.text.includes(target))
-  console.log('CLICK HERE', location, context[location]?.center)
-  if (location === -1) {
-    const msg = `Target: ${target} not found in context`
-    throw new Error(msg)
-  } else {
-    return context[location].center
   }
 }
 
