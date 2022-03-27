@@ -155,7 +155,7 @@ export default async function android(App) {
 
   // On Update
   for await (const text of textReport) {
-    // console.log('Run Apps', text.map(block => block?.text))
+    console.log('OCR Output', text.map(block => block?.text))
     const app = await App({ device, text })
     await executeStrategy(device, text, app)
   }

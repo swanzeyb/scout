@@ -3,7 +3,8 @@ import { writeFileSync, readFileSync } from 'fs'
 import preprocess from './preprocess'
 import { drawRects } from 'scout'
 
-const ENV_PROD = process.env.NODE_ENV !== 'development'
+// const ENV_PROD = process.env.NODE_ENV !== 'development'
+const ENV_PROD = true
 const ENV_DEV = !ENV_PROD
 
 const ocrConfig = {
