@@ -1,5 +1,4 @@
 export { drawRects } from './utils'
-export { createDB, set, get, has } from './database'
 
 // import browser from './browser'
 import android from './android'
@@ -10,15 +9,15 @@ export function includesText(text, keyword, then) {
   if (hasKeyword) return then()
 }
 
-export enum Environment {
+export enum Env {
   BROWSER,
   ANDROID,
 }
 
-export function start(type: Environment, App) {
+export function start(type: Env, App) {
   switch (type) {
     // case Environment.BROWSER: return browser(App)
-    case Environment.ANDROID: return android(App)
+    case Env.ANDROID: return android(App)
     default:
       throw new Error('Invalid strategy environment argument')
   }
