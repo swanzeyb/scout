@@ -1,4 +1,5 @@
 export { drawRects } from './utils'
+export { createDB, set, get, has } from './database'
 
 // import browser from './browser'
 import android from './android'

@@ -1,6 +1,7 @@
 /node_modules
 /profiles
 /debug
+.env
 
 ### macOS ###
 # General
