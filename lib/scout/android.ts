@@ -3,7 +3,7 @@ import { Buffer } from 'buffer'
 import { streamToBuffer, wait } from './utils'
 import extractTextBlocks from 'ocr-image'
 import isEqual from 'lodash/isEqual'
-import { executeSteps, targetToPoint } from './strategy'
+import { executeSteps as doSteps, targetToPoint } from './strategy'
 
 /*
   @ Android ADB Creation
@@ -32,6 +32,23 @@ export class Device extends DeviceClient {
           width: Number(width),
           height: Number(height)
         }
+      })
+  }
+
+  getActivity() {
+    return this.shell('dumpsys window windows')
+      .then(streamToBuffer)
+      .then(buff => buff.toString('utf8'))
+      .then(res => (res.match(/(?<=net.|com.).+(?=\/)/g) || [])[0])
+  }
+
+  isInteractive() {
+    return this.shell('dumpsys input_method | grep mInteractive')
+      .then(streamToBuffer)
+      .then(buff => buff.toString('utf8'))
+      .then(result => {
+        const is = result.slice(result.indexOf('mInteractive')+13).trim()
+        return is === 'true'
       })
   }
 
@@ -97,24 +114,31 @@ export async function* textContext(device: Device, resolution, delay) {
 /*
   @ Strategy Execution
 */
+function pullDownRefresh(resolution) {
+  const { width, height } = resolution
+  return [width/2, height*0.2, width/2, height*0.8]
+}
+
 function createMethods(device) {
   return {
-    'tap':         (pt) => device.tap(pt[0], pt[1]),
-    'tap above':   (pt) => device.tap(pt[0], pt[1] + 20),
-    'tap below':   (pt) => device.tap(pt[0], pt[1] - 20),
-    'tap home':    () => device.goHome(),
-    'tap back':    () => device.goBack(),
-    'tap windows': () => device.openTasker(),
-    'wait':        (amt) => wait(amt),
+    'tap':               (pt) => device.tap(pt[0], pt[1]),
+    'tap above':         (pt) => device.tap(pt[0], pt[1] + 20),
+    'tap below':         (pt) => device.tap(pt[0], pt[1] - 20),
+    'tap home':          () => device.goHome(),
+    'tap back':          () => device.goBack(),
+    'tap windows':       () => device.openTasker(),
+    'pull down refresh': (pts) => device.swipe(pts[0], pts[1], pts[2], pts[3]),
+    'wait':              (amt) => wait(amt),
   }
 }
 
 function createParsers(device, text) {
   return {
-    'tap':        (target) => targetToPoint(target, text),
-    'tap above':  (target) => targetToPoint(target, text),
-    'tap below':  (target) => targetToPoint(target, text),
-    'wait':       (amount) => Number(amount),
+    'tap':               (target) => targetToPoint(target, text),
+    'tap above':         (target) => targetToPoint(target, text),
+    'tap below':         (target) => targetToPoint(target, text),
+    'pull down refresh': () => pullDownRefresh(device.resolution),
+    'wait':              (amount) => Number(amount),
   }
 }
 
@@ -128,9 +152,16 @@ export async function executeStrategy(device, text, strategy) {
       .some(block => block.text.includes(keyword))
     if (hasKeyword) {
       const steps = strategy[keyword]
-      await executeSteps(steps, methods, parsers)
+      await doSteps(steps, methods, parsers)
     }
   }
+}
+
+export async function executeSteps(device, text, steps) {
+  const methods = createMethods(device)
+  const parsers = createParsers(device, text)
+
+  await doSteps(steps, methods, parsers)
 }
 
 /*
@@ -146,17 +177,15 @@ export default async function android(App) {
 
   const deviceId = devices[0].id
   const device = new Device(adb.getDevice(deviceId), deviceId)
-  const resolution = await device.getResolution()
-  const textReport = textContext(device, resolution, EVAL_LOOP_DELAY)
+  // const resolution = await device.getResolution()
+  // const textReport = textContext(device, resolution, EVAL_LOOP_DELAY)
 
-  // On Mount
-  const app = await App({ device, text: [] })
-  await executeStrategy(device, [], app)
+  // // On Mount
+  // await App({ device, text: [], executeSteps, executeStrategy })
 
-  // On Update
-  for await (const text of textReport) {
-    console.log('OCR Output', text.map(block => block?.text))
-    const app = await App({ device, text })
-    await executeStrategy(device, text, app)
-  }
+  // // On Update
+  // for await (const text of textReport) {
+  //   console.log('OCR Output', text.map(block => block?.text))
+  //   await App({ device, text, executeSteps, executeStrategy })
+  // }
 }
