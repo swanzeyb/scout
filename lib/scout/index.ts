@@ -22,3 +22,9 @@ export function start(type: Env, App) {
       throw new Error('Invalid strategy environment argument')
   }
 }
+
+export default {
+  createElement(tag, attrs, ...children) {
+    console.log('createElement', tag, attrs, children)
+  }
+}
