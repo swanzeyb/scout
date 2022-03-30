@@ -177,15 +177,18 @@ export default async function android(App) {
 
   const deviceId = devices[0].id
   const device = new Device(adb.getDevice(deviceId), deviceId)
-  // const resolution = await device.getResolution()
-  // const textReport = textContext(device, resolution, EVAL_LOOP_DELAY)
+  const resolution = await device.getResolution()
+  const textReport = textContext(device, resolution, EVAL_LOOP_DELAY)
 
-  // // On Mount
-  // await App({ device, text: [], executeSteps, executeStrategy })
+  // On Mount
+  await App({ device, text: [], executeSteps, executeStrategy })
 
-  // // On Update
-  // for await (const text of textReport) {
-  //   console.log('OCR Output', text.map(block => block?.text))
-  //   await App({ device, text, executeSteps, executeStrategy })
-  // }
+  // On Update
+  for await (const text of textReport) {
+    console.log('OCR Output', text.map(block => block?.text))
+    const finished = await App({ device, text, executeSteps, executeStrategy })
+    if (finished) break
+  }
+
+  console.log('Cycle Finished')
 }

@@ -1,5 +1,5 @@
 {
-  "name": "messenger",
+  "name": "messenger-lib",
   "version": "1.0.0",
   "main": "build/index.js",
   "license": "MIT",
