@@ -1,7 +1,7 @@
 {
-  "name": "database",
+  "name": "schedule",
   "version": "1.0.0",
-  "main": "build/index.js",
+  "main": "index.ts",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -9,9 +9,10 @@
     "build": "tsc"
   },
   "devDependencies": {
-    "typescript": "^4.6.2"
+    "nodemon": "^2.0.15"
   },
   "dependencies": {
-    "mongodb": "^4.4.1"
+    "agenda": "^4.2.1",
+    "ts-node": "^10.7.0"
   }
 }

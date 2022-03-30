@@ -11,7 +11,8 @@
     "packages": [
       "lib/*",
       "scripts/*",
-      "apps/*"
+      "apps/*",
+      "apis/*"
     ]
   }
 }
