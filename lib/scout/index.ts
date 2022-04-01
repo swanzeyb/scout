@@ -1,5 +1,3 @@
-export { drawRects } from './utils'
-
 // import browser from './browser'
 import android from './android'
 

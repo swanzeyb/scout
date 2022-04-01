@@ -1,9 +1,11 @@
 import Adb, { DeviceClient } from '@devicefarmer/adbkit'
 import { Buffer } from 'buffer'
 import { streamToBuffer, wait } from './utils'
-import extractTextBlocks from 'ocr-image'
 import isEqual from 'lodash/isEqual'
+import FormData from 'form-data'
 import { executeSteps as doSteps, targetToPoint } from './strategy'
+
+const TEXT_API_URI = getEnv('TEXT_API_URI')
 
 /*
   @ Android ADB Creation
@@ -86,6 +88,31 @@ export class Device extends DeviceClient {
 /*
   @ Context Report Generators
 */
+function getEnv(key: string) {
+  const result = process.env[key]
+  if (!result) {
+    const msg = `${key} missing from env`
+    throw new Error(msg)
+  }
+  return result
+}
+
+export function extractTextBlocks(image, viewport): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData()
+    form.append('image', image)
+    form.append('viewport', JSON.stringify(viewport))
+    form.submit(TEXT_API_URI, (err, response) => {
+      if (err) return reject(err)
+      response.once('data', buffer => {
+        const str = buffer.toString('utf8')
+        const json = JSON.parse(str)
+        resolve(json)
+      })
+    })
+  })
+}
+
 export async function* textContext(device: Device, resolution, delay) {
   const last = {
     cap: Buffer.alloc(0),
@@ -100,7 +127,7 @@ export async function* textContext(device: Device, resolution, delay) {
 
     if (Buffer.compare(last.cap, cap) !== 0) {
       last.cap = cap
-      const texts = await extractTextBlocks(cap, resolution)
+      const texts: any = await extractTextBlocks(cap, resolution)
       if (!isEqual(last.texts, texts)) {
         last.texts = texts
         yield texts

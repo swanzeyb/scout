@@ -6,7 +6,7 @@ export function wait(delay) {
   })
 }
 
-export function streamToBuffer(stream) {
+export function streamToBuffer(stream): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const buffers: any = []
     stream.on('data', data => buffers.push(data))
@@ -15,6 +15,7 @@ export function streamToBuffer(stream) {
   })
 }
 
+/*
 import gmFactory from 'gm'
 const gm = gmFactory.subClass({ imageMagick: true })
 
@@ -45,3 +46,4 @@ export function drawRects(imgPath: string, rects: Rect[]) {
     resolve(null)
   }))()
 }
+*/
