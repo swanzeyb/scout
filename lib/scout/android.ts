@@ -1,10 +1,12 @@
 import Adb, { DeviceClient } from '@devicefarmer/adbkit'
 import { Buffer } from 'buffer'
-import { streamToBuffer, wait, getEnv } from './utils'
 import FormData from 'form-data'
 import { executeSteps as doSteps, targetToPoint } from './strategy'
+import { getEnv, streamToBuffer, wait } from './utils'
+import { EventEmitter } from 'events'
 
 const TEXT_API_URI = getEnv('TEXT_API_URI')
+const EVAL_LOOP_DELAY = Number(getEnv('EVAL_LOOP_DELAY'))
 
 /*
   @ Android ADB Creation
@@ -96,7 +98,9 @@ export function extractTextBlocks(image, viewport): Promise<any> {
       if (err) return reject(err)
       response.once('data', buffer => {
         const str = buffer.toString('utf8')
-        const json = JSON.parse(str)
+        if (str === 'Internal Server Error')
+          reject('OCR API returned an internal error')
+        const json = JSON.parse(str)['text']
         resolve(json)
       })
     })
@@ -110,7 +114,7 @@ export async function* textContext(device: Device, resolution, delay) {
   }
 
   while (true) {
-    console.time('Eval Loop')
+    // console.time('Eval Loop')
     await wait(delay)
     const cap = await device.screencap()
       .then(streamToBuffer)
@@ -124,7 +128,7 @@ export async function* textContext(device: Device, resolution, delay) {
       yield last.texts
     }
 
-    console.timeEnd('Eval Loop')
+    // console.timeEnd('Eval Loop')
   }
 }
 
@@ -184,52 +188,35 @@ export async function executeSteps(device, text, steps) {
 /*
   @ Device Setup
 */
-async function setupAndroid() {
+export async function session() {
   const devices = await adb.listDevices()
   
   if (devices.length < 1)
     throw new Error('No Android devices found')
 
+  // For now, use first device found
   const deviceId = devices[0].id
   const device = new Device(adb.getDevice(deviceId), deviceId)
   const resolution = await device.getResolution()
+
+  // Text on screen report generator
   const textReport = textContext(device, resolution, EVAL_LOOP_DELAY)
 
-  return { device, textReport }
-}
+  // Setup event emitter for new text reported on screen
+  const session = new EventEmitter()
 
-const setup = setupAndroid()
+  // Device actions
+  let lastText = []
+  const perform = (steps) => executeSteps(device, lastText, steps)
 
-/*
-  @ Context Evaluation Loop
-*/
-const EVAL_LOOP_DELAY = 1000 * 1
-
-export default async function androidLoop(App) {
-  const { device, textReport } = await setup
-
-  // On Mount
-  await App({ device, text: [], executeSteps, executeStrategy })
-
-  // On Update
-  for await (const text of textReport) {
-    console.log('OCR Output', text.map(block => block?.text))
-    const finished = await App({ device, text, executeSteps, executeStrategy })
-    if (finished) break
+  // Monitor for text events
+  const begin = async () => {
+    for await (const text of textReport) {
+      lastText = text
+      session.emit('update', text)
+    }
   }
 
-  console.log('Cycle Finished')
-}
-
-/*
-  @ Non-Looping Context Evaluation
-*/
-export async function android(App) {
-  const { device, textReport } = await setup
-  const perform = async steps => {
-    const { value } = await textReport.next()
-    await executeSteps(device, value, steps)
-  }
-
-  await App({ device, text: textReport, perform })
+  begin()
+  return { device, perform, session }
 }

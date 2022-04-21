@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@devicefarmer/adbkit": "^3.2.1",
-    "agenda": "^4.2.1",
     "debounce": "^1.2.1",
     "dotenv": "^16.0.0",
     "form-data": "^4.0.0",

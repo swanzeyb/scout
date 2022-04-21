@@ -1,6 +1,5 @@
 // import browser from './browser'
-import androidLoop, { android } from './android'
-import { define, every } from './agenda'
+import { session as androidSession } from './android'
 
 export function includesText(text, keyword, then) {
   const hasKeyword = text
@@ -13,23 +12,13 @@ export enum Env {
   ANDROID,
 }
 
-// This function evalutes the screen at a set interval
-export function start(type: Env, App, when) {
+export function createSession(type: Env) {
   switch (type) {
     // case Environment.BROWSER: return browser(App)
-    case Env.ANDROID: return androidLoop(App)
+    case Env.ANDROID: return androidSession()
     default:
-      throw new Error('Invalid strategy environment argument')
+      throw new Error('Invalid session environment argument')
   }
-}
-
-export async function schedule(when, what, App) {
-  await define(what, async () => {
-    console.log('RUN APP')
-    await android(App)
-  })
-  await every(when, what)
-  console.log('SCHEDULED')
 }
 
 /*

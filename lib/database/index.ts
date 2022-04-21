@@ -2,7 +2,7 @@
 import { getEnv } from './env'
 import { MongoClient } from 'mongodb'
 
-export async function createDB(database, collection) {
+export async function collection(database, collection) {
   const MONGO_URI = getEnv('MONGO_URI')
   const client = await new MongoClient(MONGO_URI).connect()
   const db = client.db(database)
@@ -10,9 +10,8 @@ export async function createDB(database, collection) {
   return col
 }
 
-export async function subscribe(database, collection, then) {
-  const col = await createDB(database, collection)
-  col.watch().on('change', change => {
+export function subscribe(collection, then) {
+  collection.watch().on('change', change => {
     const {
       operationType: type,
       fullDocument: document,
