@@ -1,7 +1,6 @@
 import Adb, { DeviceClient } from '@devicefarmer/adbkit'
 import { Buffer } from 'buffer'
-import { streamToBuffer, wait } from './utils'
-import isEqual from 'lodash/isEqual'
+import { streamToBuffer, wait, getEnv } from './utils'
 import FormData from 'form-data'
 import { executeSteps as doSteps, targetToPoint } from './strategy'
 
@@ -88,15 +87,6 @@ export class Device extends DeviceClient {
 /*
   @ Context Report Generators
 */
-function getEnv(key: string) {
-  const result = process.env[key]
-  if (!result) {
-    const msg = `${key} missing from env`
-    throw new Error(msg)
-  }
-  return result
-}
-
 export function extractTextBlocks(image, viewport): Promise<any> {
   return new Promise((resolve, reject) => {
     const form = new FormData()
@@ -128,10 +118,10 @@ export async function* textContext(device: Device, resolution, delay) {
     if (Buffer.compare(last.cap, cap) !== 0) {
       last.cap = cap
       const texts: any = await extractTextBlocks(cap, resolution)
-      if (!isEqual(last.texts, texts)) {
-        last.texts = texts
-        yield texts
-      } 
+      last.texts = texts
+      yield texts
+    } else {
+      yield last.texts
     }
 
     console.timeEnd('Eval Loop')
@@ -192,11 +182,9 @@ export async function executeSteps(device, text, steps) {
 }
 
 /*
-  @ Context Evaluation Loop
+  @ Device Setup
 */
-const EVAL_LOOP_DELAY = 1000 * 1
-
-export default async function android(App) {
+async function setupAndroid() {
   const devices = await adb.listDevices()
   
   if (devices.length < 1)
@@ -206,6 +194,19 @@ export default async function android(App) {
   const device = new Device(adb.getDevice(deviceId), deviceId)
   const resolution = await device.getResolution()
   const textReport = textContext(device, resolution, EVAL_LOOP_DELAY)
+
+  return { device, textReport }
+}
+
+const setup = setupAndroid()
+
+/*
+  @ Context Evaluation Loop
+*/
+const EVAL_LOOP_DELAY = 1000 * 1
+
+export default async function androidLoop(App) {
+  const { device, textReport } = await setup
 
   // On Mount
   await App({ device, text: [], executeSteps, executeStrategy })
@@ -218,4 +219,17 @@ export default async function android(App) {
   }
 
   console.log('Cycle Finished')
+}
+
+/*
+  @ Non-Looping Context Evaluation
+*/
+export async function android(App) {
+  const { device, textReport } = await setup
+  const perform = async steps => {
+    const { value } = await textReport.next()
+    await executeSteps(device, value, steps)
+  }
+
+  await App({ device, text: textReport, perform })
 }
