@@ -1,10 +1,15 @@
 // import browser from './browser'
 import { session as androidSession } from './android'
+export { Device, executeSteps } from './android'
+export { wait } from './utils'
 
-export function includesText(text, keyword, then) {
-  const hasKeyword = text
-    .text(block => block.text.includes(keyword))
-  if (hasKeyword) return then()
+export function getEnv(key: string) {
+  const result = process.env[key]
+  if (!result) {
+    const msg = `${key} missing from env`
+    throw new Error(msg)
+  }
+  return result
 }
 
 export enum Env {
@@ -12,10 +17,10 @@ export enum Env {
   ANDROID,
 }
 
-export function createSession(type: Env) {
+export function createSession(type: Env, id) {
   switch (type) {
     // case Environment.BROWSER: return browser(App)
-    case Env.ANDROID: return androidSession()
+    case Env.ANDROID: return androidSession(id)
     default:
       throw new Error('Invalid session environment argument')
   }

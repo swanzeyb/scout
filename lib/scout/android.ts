@@ -18,9 +18,6 @@ export class Device extends DeviceClient {
 
   constructor(client, serial) {
     super(client, serial)
-    this.getResolution().then(res => {
-      this.resolution = res
-    })
   }
 
   getResolution() {
@@ -31,10 +28,11 @@ export class Device extends DeviceClient {
         const [width, height] = result
           .trim()
           .slice(result.indexOf(': ') + 2).split('x')
-        return {
+        this.resolution = {
           width: Number(width),
           height: Number(height)
         }
+        return this.resolution
       })
   }
 
@@ -65,6 +63,26 @@ export class Device extends DeviceClient {
 
   swipe(x1, y1, x2, y2) {
     return this.shell(`input touchscreen swipe ${x1} ${y1} ${x2} ${y2}`)
+  }
+
+  type(text) {
+    return this.shell(`input text "${text}"`)
+      .then(stream => {
+        stream.on('data', data => console.log('DATA YO', data))
+      })
+  }
+
+  openApp(bundleID) {
+    console.log('open bundle', bundleID)
+    return this.shell(`monkey -p ${bundleID} -c android.intent.category.LAUNCHER 1`)
+  }
+
+  closeApp(bundleID) {
+    return this.shell(`am force-stop ${bundleID}`)
+  }
+
+  keycode(code) {
+    return this.shell(`input keyevent ${code}`)
   }
 
   goBack() {
@@ -135,9 +153,27 @@ export async function* textContext(device: Device, resolution, delay) {
 /*
   @ Strategy Execution
 */
-function pullDownRefresh(resolution) {
-  const { width, height } = resolution
-  return [width/2, height*0.2, width/2, height*0.8]
+const android = {
+  refresh: ({ width, height }) => [width/2, height*0.14, width/2, height*0.5],
+  scrollDown: ({ width, height }) => [width/2, height*0.7, width/2, height*0.35], // Meaning, see content further down
+  scrollUp: ({ width, height }) => [width/2, height*0.35, width/2, height*0.7], // Meaning, see content further up
+  tapVertical: (target, text, direction) => {
+    const location = text
+      .findIndex(block => block.text.includes(target))
+    if (location === -1) {
+      const msg = `Target: ${target} not found in context`
+      throw new Error(msg)
+    } else {
+      const block = text[location]
+      return direction === -1
+        ? [block.left + 10, block.top + block.height + 120]
+        : [block.left + 10, block.top - 120]
+    }
+  },
+}
+
+const chrome = {
+  searchBar: ({ width, height }) => [width / 2, 124],
 }
 
 function createMethods(device) {
@@ -148,33 +184,29 @@ function createMethods(device) {
     'tap home':          () => device.goHome(),
     'tap back':          () => device.goBack(),
     'tap windows':       () => device.openTasker(),
+    'Chrome search':     (pt) => device.tap(pt[0], pt[1]),
     'pull down refresh': (pts) => device.swipe(pts[0], pts[1], pts[2], pts[3]),
+    'scroll down':       (pts) => device.swipe(pts[0], pts[1], pts[2], pts[3]),
+    'scroll up':         (pts) => device.swipe(pts[0], pts[1], pts[2], pts[3]),
+    'type':              (txt) => device.type(txt),
     'wait':              (amt) => wait(amt),
+    'enter':             (code) => device.keycode(code),
+    'open':              (app) => device.openApp(app),
+    'close':             (app) => device.closeApp(app),
   }
 }
 
 function createParsers(device, text) {
   return {
     'tap':               (target) => targetToPoint(target, text),
-    'tap above':         (target) => targetToPoint(target, text),
-    'tap below':         (target) => targetToPoint(target, text),
-    'pull down refresh': () => pullDownRefresh(device.resolution),
+    'tap above':         (target) => android.tapVertical(target, text, 1),
+    'tap below':         (target) => android.tapVertical(target, text, -1),
+    'Chrome search':     () => chrome.searchBar(device.resolution),
+    'pull down refresh': () => android.refresh(device.resolution),
+    'scroll down':       () => android.scrollDown(device.resolution),
+    'scroll up':         () => android.scrollUp(device.resolution),
     'wait':              (amount) => Number(amount),
-  }
-}
-
-export async function executeStrategy(device, text, strategy) {
-  const methods = createMethods(device)
-  const parsers = createParsers(device, text)
-
-  const keywords = Object.keys(strategy).entries()
-  for (const [_, keyword] of keywords) {
-    const hasKeyword = text
-      .some(block => block.text.includes(keyword))
-    if (hasKeyword) {
-      const steps = strategy[keyword]
-      await doSteps(steps, methods, parsers)
-    }
+    'enter':             () => 66,
   }
 }
 
@@ -182,17 +214,88 @@ export async function executeSteps(device, text, steps) {
   const methods = createMethods(device)
   const parsers = createParsers(device, text)
 
-  await doSteps(steps, methods, parsers)
+  const actions = typeof steps === 'string' ? [steps] : steps
+  await doSteps(actions, methods, parsers)
+}
+
+class Session extends EventEmitter {
+  public textBlocks
+  private blocksReporter
+  private device
+
+  constructor(blocksReporter, device) {
+    super()
+    this.blocksReporter = blocksReporter
+    this.device = device
+  }
+
+  async start() {
+    for await (const textBlocks of this.blocksReporter) {
+      this.textBlocks = textBlocks
+      this.emit('update', textBlocks)
+    }
+  }
+
+  waitOneCycle() {
+    return new Promise(resolve => {
+      this.once('update', () => {
+        resolve(null)
+      })
+    })
+  }
+
+  stopExecution() {
+    this.emit('cancel')
+  }
+
+  perform(steps) {
+    return executeSteps(this.device, this.textBlocks, steps)
+  }
+
+  repeatUntilText(text, repeat, timeout=60000) {
+    let start = Date.now()
+    let stop = false
+    return new Promise((resolve, reject) => {
+      const hasTextYet = async (blocks) => {
+        if (blocks.some(block => block.text.includes(text)) || stop) {
+          this.removeListener('update', hasTextYet)
+          await this.waitOneCycle()
+          resolve(null)
+        } else if (Date.now() - start > timeout) {
+          reject('Operation Timeout')
+        } else {
+          repeat()
+        }
+      }
+      this.on('update', hasTextYet)
+      this.once('cancel', () => {
+        stop = true
+      })
+    })
+  }
+
+  waitForText(text) {
+    return this.repeatUntilText(text, () => null)
+  }
+
+  scrollDownToText(text) {
+    return this.repeatUntilText(text, async () => {
+      await this.perform(['wait 200', 'scroll down', 'wait 200'])
+    })
+  }
 }
 
 /*
   @ Device Setup
 */
-export async function session() {
+export async function session(id) {
   const devices = await adb.listDevices()
   
   if (devices.length < 1)
     throw new Error('No Android devices found')
+
+  if (!devices.some(device => device.id === id))
+    throw new Error(`Android Device ID '${id}' not found`)
 
   // For now, use first device found
   const deviceId = devices[0].id
@@ -200,23 +303,11 @@ export async function session() {
   const resolution = await device.getResolution()
 
   // Text on screen report generator
-  const textReport = textContext(device, resolution, EVAL_LOOP_DELAY)
+  const textBlocks = textContext(device, resolution, EVAL_LOOP_DELAY)
 
-  // Setup event emitter for new text reported on screen
-  const session = new EventEmitter()
+  // Start getting text off screen of device
+  const session = new Session(textBlocks, device)
+  session.start()
 
-  // Device actions
-  let lastText = []
-  const perform = (steps) => executeSteps(device, lastText, steps)
-
-  // Monitor for text events
-  const begin = async () => {
-    for await (const text of textReport) {
-      lastText = text
-      session.emit('update', text)
-    }
-  }
-
-  begin()
-  return { device, perform, session }
+  return { device, session }
 }

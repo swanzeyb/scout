@@ -22,6 +22,7 @@ export function parseQuery(query, methods) {
 export async function executeSteps(steps, methods, parsers) {
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
+    console.log('execute step', step)
     const [method, payload] = parseQuery(step, methods)
     const action = methods[method]
     const parser = parsers[method]

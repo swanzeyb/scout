@@ -1,0 +1,54 @@
+version: '3'
+
+services:
+  adb-server:
+    image: gounthar/docker-adb:aarch64
+    network_mode: host
+    privileged: true
+    # ports:
+    #   - '5037:5037'
+    volumes:
+      - '/dev/bus/usb:/dev/bus/usb'
+
+  marketplace:
+    image: 'swanzeyb/marketplace'
+    restart: on-failure:3
+    network_mode: host
+    depends_on:
+      - adb-server
+      - ocr-api
+      - messenger-api
+    environment:
+      - MONGO_URI=
+      - TEXT_API_URI=http://localhost:8001/text
+      - MESSENGER_API_URI=http://localhost:8002/sms
+      - EVAL_LOOP_DELAY=3000
+      - DEVICE_ID=
+
+  debug:
+    image: 'swanzeyb/debug'
+    network_mode: host
+    depends_on:
+      - adb-server
+      - ocr-api
+    environment:
+      - TEXT_API_URI=http://localhost:8001/text
+      - EVAL_LOOP_DELAY=10000
+
+  ocr-api:
+    image: 'swanzeyb/ocr'
+    network_mode: host
+    # ports:
+    #   - '8001:8080'
+
+  messenger-api:
+    image: 'swanzeyb/messenger'
+    network_mode: host
+    # ports:
+    #   - '8002:8080'
+    environment:
+      - TWILIO_SID=
+      - TWILIO_SECRET=
+      - TWILIO_FROM=
+      - SENDGRID_KEY=
+      - SENDGRID_FROM=
